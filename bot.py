@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import aiohttp
+from aiohttp import web  # Added for health check
 from telegram import Bot
 from telegram.constants import ParseMode
 from datetime import datetime
@@ -15,7 +16,6 @@ logger = logging.getLogger(__name__)
 
 last_stock = {}
 
-# Emoji map
 emoji_map = {
     # Seeds
     "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🍇", "Tomato": "🍅", "Corn": "🌽",
@@ -36,7 +36,6 @@ emoji_map = {
     "Mythical Egg": "🔴", "Bug Egg": "🐛", "Bee Egg": "🐝"
 }
 
-
 def format_stock(title, items):
     message = f"*{title.upper()}*\n"
     for item in items:
@@ -47,7 +46,6 @@ def format_stock(title, items):
     return message
 
 def build_message(stock_data):
-    # Get current time in Asia/Manila timezone using 12-hour format
     ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
     header = f"🕒 *New Stock Detected!*\n📅 Date & Time: `{ph_time}`\n\n"
 
@@ -96,6 +94,25 @@ async def main_loop():
 
         await asyncio.sleep(60)
 
+# Health check web server
+async def healthcheck(request):
+    return web.Response(text="Bot is alive!")
+
+async def start_webserver():
+    app = web.Application()
+    app.router.add_get("/", healthcheck)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, port=8080)
+    await site.start()
+    logger.info("Health check server started on port 8080")
+
+async def main():
+    await asyncio.gather(
+        start_webserver(),
+        main_loop()
+    )
+
 if __name__ == "__main__":
     logger.info("GrowAGarden Telegram bot started.")
-    asyncio.run(main_loop())
+    asyncio.run(main())
