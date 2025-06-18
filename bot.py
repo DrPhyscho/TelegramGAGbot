@@ -111,12 +111,28 @@ async def notifylist_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
+async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
+    item_count = len(user_preferences)
+    item_list = '\n'.join([f"{emoji_map.get(item, '📦')} {item}" for item in sorted(user_preferences)])
+
+    message = (
+        "✅ *Bot Status: Alive*\n"
+        f"🕒 *Current Time (PH)*: `{ph_time}`\n"
+        f"📦 *Tracking {item_count} item(s)*\n"
+    )
+
+    if item_count:
+        message += "\n🔔 *Items Being Tracked:*\n" + item_list
+
+    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+
 # --- Background Task ---
 
 async def stock_monitor(bot: Bot):
     global last_stock
     while True:
-        logger.info("Checking for new stock updates...")
+        logger.info("✅ Checking for new stock...")
         stock = await fetch_from_api()
         if stock:
             matched = []
@@ -124,14 +140,14 @@ async def stock_monitor(bot: Bot):
                 matched.extend([item for item in stock.get(section, []) if item.get("display_name") in user_preferences])
 
             if matched and stock != last_stock:
-                logger.info("Notifying about new matching stock...")
+                logger.info("📦 New stock detected, sending a message...")
                 message = build_message(stock)
                 try:
                     await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN)
                     last_stock = stock
                 except Exception as e:
-                    logger.error(f"Telegram send failed: {e}")
-        await asyncio.sleep(60)
+                    logger.error(f"❌ Telegram send failed: {e}")
+        await asyncio.sleep(15)
 
 # --- Webserver ---
 
@@ -145,7 +161,7 @@ async def start_webserver():
     await runner.setup()
     site = web.TCPSite(runner, port=8080)
     await site.start()
-    logger.info("Health check server started on port 8080 and is alive!")
+    logger.info("🌐 Health check server started on port 8080 and is alive!")
 
 # --- Main ---
 
@@ -155,6 +171,7 @@ async def main():
 
     app.add_handler(CommandHandler("notify", notify_command))
     app.add_handler(CommandHandler("notifylist", notifylist_command))
+    app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CallbackQueryHandler(button_handler))
 
     await asyncio.gather(
@@ -165,5 +182,5 @@ async def main():
 
 if __name__ == "__main__":
     nest_asyncio.apply()
-    logger.info("GrowAGarden Telegram bot started.")
+    logger.info("🚀 GrowAGarden Telegram bot started.")
     asyncio.get_event_loop().run_until_complete(main())
