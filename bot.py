@@ -1,40 +1,59 @@
 import asyncio
 import logging
 import aiohttp
-from aiohttp import web  # Added for health check
-from telegram import Bot
+from aiohttp import web
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.constants import ParseMode
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 from datetime import datetime
-import pytz  # Required for timezone support
+import pytz
+import os
+import nest_asyncio
 
+# Configuration
 TOKEN = '7782209619:AAELIyg4HTcOv58K5yObibFVyC44S3s3TM4'
 CHAT_ID = '6172646907'
 STOCK_URL = 'https://api.joshlei.com/v2/growagarden/stock'
 
+# Logging setup
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# State
 last_stock = {}
+user_preferences = set()
 
+# Emoji map
 emoji_map = {
-    # Seeds
     "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🍇", "Tomato": "🍅", "Corn": "🌽",
-    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🎋",
+    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🍋",
     "Coconut": "🥥", "Cactus": "🌵", "Dragon Fruit": "🐉", "Grape": "🍇", "Mushroom": "🍄",
     "Pepper": "🌶️", "Cacao": "🍫", "Bean Stalk": "🥒", "Ember Lily": "🔥",
     "Lavender Seed": "💜", "Nectarshade Seed": "🌸", "Flower Seed Pack": "🌻",
-    "Nectarine Seed": "🍑", "Hive Fruit Seed": "🐝","Orange Tulip": "🧡",
-    # Gear
-    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "🥄", "Basic Sprinkler": "💦",
-    "Advanced Sprinkler": "💧", "Godly Sprinkler": "⚡", "Lightning Rod": "🌩️",
+    "Nectarine Seed": "🍑", "Hive Fruit Seed": "🐝", "Orange Tulip": "🦚",
+    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "🥄", "Basic Sprinkler": "🚶",
+    "Advanced Sprinkler": "🚷", "Godly Sprinkler": "⚡", "Lightning Rod": "🌩️",
     "Master Sprinkler": "👑", "Favourite Tool": "⭐", "Harvest Tool": "✂️",
-    "Friendship Pot": "🤝", "Pollen Radar": "📡", "Nectar Staff": "🌟", "Honey Sprinkler": "🍯",
-    "Bee Crate": "📦", "Honey Walkway": "🛤️", "Honey Comb": "🍯", "Bee Chair": "🪑", "Cleaning Spray": "🔫",
-    "Honey Torch": "🕯",
-    # Eggs
-    "Common Egg": "⚪", "Uncommon Egg": "🟢", "Rare Egg": "🔵", "Legendary Egg": "🟣",
+    "Friendship Pot": "🤝", "Pollen Radar": "📱", "Nectar Staff": "🌟", "Honey Sprinkler": "🍯",
+    "Bee Crate": "📦", "Honey Walkway": "🛏️", "Honey Comb": "🍯", "Bee Chair": "🪑", "Cleaning Spray": "🔫",
+    "Honey Torch": "🕯️",
+    "Common Egg": "⚪", "Uncommon Egg": "🟢", "Rare Egg": "🔵", "Legendary Egg": "🔹",
     "Mythical Egg": "🔴", "Bug Egg": "🐛", "Bee Egg": "🐝"
 }
+
+all_items = list(emoji_map.keys())
+
+# --- Helper Functions ---
+
+async def fetch_from_api():
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(STOCK_URL, timeout=10) as resp:
+                resp.raise_for_status()
+                return await resp.json()
+    except Exception as e:
+        logger.error(f"API fetch failed: {e}")
+        return None
 
 def format_stock(title, items):
     message = f"*{title.upper()}*\n"
@@ -48,53 +67,74 @@ def format_stock(title, items):
 def build_message(stock_data):
     ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
     header = f"🕒 *New Stock Detected!*\n📅 Date & Time: `{ph_time}`\n\n"
-
     parts = []
-    if "seed_stock" in stock_data:
-        parts.append(format_stock("Seed Stock", stock_data["seed_stock"]))
-    if "gear_stock" in stock_data:
-        parts.append(format_stock("Gear Stock", stock_data["gear_stock"]))
-    if "egg_stock" in stock_data:
-        parts.append(format_stock("Egg Stock", stock_data["egg_stock"]))
-    if "cosmetic_stock" in stock_data:
-        parts.append(format_stock("Cosmetic Stock", stock_data["cosmetic_stock"]))
+
+    for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
+        items = stock_data.get(section, [])
+        filtered = [item for item in items if item.get("display_name") in user_preferences]
+        if filtered:
+            parts.append(format_stock(section.replace('_', ' ').title(), filtered))
 
     return header + "\n\n".join(parts)
 
-async def fetch_from_api():
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(STOCK_URL, timeout=10) as resp:
-                resp.raise_for_status()
-                return await resp.json()
-    except Exception as e:
-        logger.error(f"API fetch failed: {e}")
-        return None
+# --- Command Handlers ---
 
-async def main_loop():
-    bot = Bot(token=TOKEN)
+async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    keyboard = []
+    for item in all_items:
+        emoji = emoji_map.get(item, "📦")
+        keyboard.append([InlineKeyboardButton(f"{emoji} {item}", callback_data=item)])
+
+    await update.message.reply_text("Select items to get notified for:", reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    item = query.data
+    if item in user_preferences:
+        user_preferences.remove(item)
+        await query.edit_message_text(text=f"❌ Removed *{item}* from notification list.", parse_mode=ParseMode.MARKDOWN)
+    else:
+        user_preferences.add(item)
+        await query.edit_message_text(text=f"✅ Added *{item}* to notification list.", parse_mode=ParseMode.MARKDOWN)
+
+async def notifylist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not user_preferences:
+        await update.message.reply_text("You have not selected any items yet.")
+        return
+
+    msg = "*Your Selected Notification Items:*\n"
+    for item in sorted(user_preferences):
+        emoji = emoji_map.get(item, "📦")
+        msg += f"{emoji} {item}\n"
+
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
+
+# --- Background Task ---
+
+async def stock_monitor(bot: Bot):
     global last_stock
-
     while True:
+        logger.info("Checking for new stock updates...")
         stock = await fetch_from_api()
-
         if stock:
-            if stock != last_stock:
-                logger.info("New stock detected. Sending to Telegram...")
+            matched = []
+            for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
+                matched.extend([item for item in stock.get(section, []) if item.get("display_name") in user_preferences])
+
+            if matched and stock != last_stock:
+                logger.info("Notifying about new matching stock...")
                 message = build_message(stock)
                 try:
                     await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN)
                     last_stock = stock
                 except Exception as e:
                     logger.error(f"Telegram send failed: {e}")
-            else:
-                logger.info("Stock has not changed.")
-        else:
-            logger.warning("Stock fetch failed.")
-
         await asyncio.sleep(60)
 
-# Health check web server
+# --- Webserver ---
+
 async def healthcheck(request):
     return web.Response(text="Bot is alive!")
 
@@ -105,14 +145,25 @@ async def start_webserver():
     await runner.setup()
     site = web.TCPSite(runner, port=8080)
     await site.start()
-    logger.info("Health check server started on port 8080")
+    logger.info("Health check server started on port 8080 and is alive!")
+
+# --- Main ---
 
 async def main():
+    bot = Bot(TOKEN)
+    app = Application.builder().token(TOKEN).build()
+
+    app.add_handler(CommandHandler("notify", notify_command))
+    app.add_handler(CommandHandler("notifylist", notifylist_command))
+    app.add_handler(CallbackQueryHandler(button_handler))
+
     await asyncio.gather(
+        app.run_polling(),
         start_webserver(),
-        main_loop()
+        stock_monitor(bot)
     )
 
 if __name__ == "__main__":
+    nest_asyncio.apply()
     logger.info("GrowAGarden Telegram bot started.")
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
