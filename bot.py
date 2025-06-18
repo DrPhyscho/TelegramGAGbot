@@ -163,7 +163,7 @@ async def start_webserver():
     await site.start()
     logger.info("🌐 Health check server running on http://0.0.0.0:8080")
 
-# --- Main ---
+# --- Main Function ---
 
 async def main():
     logger.info("🎯 Starting GrowAGarden bot...")
@@ -175,14 +175,13 @@ async def main():
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    await app.initialize()
-    await app.start()
-
     await start_webserver()
     asyncio.create_task(stock_monitor(bot))
 
     logger.info("🚀 GrowAGarden bot + server is running...")
-    await asyncio.Event().wait()  # Keeps everything alive
+    await app.run_polling()  # ✅ This handles init/start/polling automatically
+
+# --- Entry Point ---
 
 if __name__ == "__main__":
     nest_asyncio.apply()
