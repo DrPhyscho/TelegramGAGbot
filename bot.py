@@ -71,7 +71,10 @@ def build_message(stock_data):
 
     for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
         items = stock_data.get(section, [])
-        filtered = [item for item in items if item.get("display_name") in user_preferences]
+        if user_preferences:
+            filtered = [item for item in items if item.get("display_name") in user_preferences]
+        else:
+            filtered = items  # Show all if no preferences
         if filtered:
             parts.append(format_stock(section.replace('_', ' ').title(), filtered))
 
@@ -84,13 +87,11 @@ async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     for item in all_items:
         emoji = emoji_map.get(item, "📦")
         keyboard.append([InlineKeyboardButton(f"{emoji} {item}", callback_data=item)])
-
     await update.message.reply_text("Select items to get notified for:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-
     item = query.data
     if item in user_preferences:
         user_preferences.remove(item)
@@ -104,7 +105,7 @@ async def notifylist_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_text("You have not selected any items yet.")
         return
 
-    msg = "*Your Selected Notification Items:*\n"
+    msg = "*Your Selected Stock Items:*\n"
     for item in sorted(user_preferences):
         emoji = emoji_map.get(item, "📦")
         msg += f"{emoji} {item}\n"
@@ -135,11 +136,20 @@ async def stock_monitor(bot: Bot):
         logger.info("✅ Checking for new stock...")
         stock = await fetch_from_api()
         if stock:
-            matched = []
-            for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
-                matched.extend([item for item in stock.get(section, []) if item.get("display_name") in user_preferences])
+            should_notify = False
 
-            if matched and stock != last_stock:
+            if user_preferences:
+                for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
+                    for item in stock.get(section, []):
+                        if item.get("display_name") in user_preferences:
+                            should_notify = True
+                            break
+                    if should_notify:
+                        break
+            else:
+                should_notify = True  # Notify all if no preferences
+
+            if should_notify and stock != last_stock:
                 logger.info("📦 New stock detected, sending a message...")
                 message = build_message(stock)
                 try:
@@ -147,6 +157,7 @@ async def stock_monitor(bot: Bot):
                     last_stock = stock
                 except Exception as e:
                     logger.error(f"❌ Telegram send failed: {e}")
+
         await asyncio.sleep(15)
 
 # --- Webserver for UptimeRobot ---
@@ -179,7 +190,7 @@ async def main():
     asyncio.create_task(stock_monitor(bot))
 
     logger.info("🚀 GrowAGarden bot + server is running...")
-    await app.run_polling()  # ✅ This handles init/start/polling automatically
+    await app.run_polling()
 
 # --- Entry Point ---
 
