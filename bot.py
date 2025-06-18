@@ -149,7 +149,7 @@ async def stock_monitor(bot: Bot):
                     logger.error(f"❌ Telegram send failed: {e}")
         await asyncio.sleep(15)
 
-# --- Webserver ---
+# --- Health Check Server ---
 
 async def healthcheck(request):
     return web.Response(text="Bot is alive!")
@@ -159,11 +159,11 @@ async def start_webserver():
     app.router.add_get("/", healthcheck)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, port=8080)
+    site = web.TCPSite(runner, host="0.0.0.0", port=8080)  # <- Required for Railway
     await site.start()
-    logger.info("🌐 Health check server started on port 8080 and is alive!")
+    logger.info("🌐 Health check server running on http://0.0.0.0:8080")
 
-# --- Main ---
+# --- Main Entry ---
 
 async def main():
     bot = Bot(TOKEN)
@@ -174,13 +174,17 @@ async def main():
     app.add_handler(CommandHandler("status", status_command))
     app.add_handler(CallbackQueryHandler(button_handler))
 
-    await asyncio.gather(
-        app.run_polling(),
-        start_webserver(),
-        stock_monitor(bot)
-    )
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+
+    await start_webserver()
+    asyncio.create_task(stock_monitor(bot))
+
+    logger.info("🚀 GrowAGarden bot + server is running...")
+    await app.updater.idle()
 
 if __name__ == "__main__":
     nest_asyncio.apply()
-    logger.info("🚀 GrowAGarden Telegram bot started.")
-    asyncio.get_event_loop().run_until_complete(main())
+    logger.info("🎯 Starting GrowAGarden bot...")
+    asyncio.run(main())
