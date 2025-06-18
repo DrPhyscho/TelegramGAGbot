@@ -25,20 +25,20 @@ user_preferences = set()
 
 # Emoji map
 emoji_map = {
-    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🍇", "Tomato": "🍅", "Corn": "🌽",
-    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🍋",
+    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🫐", "Tomato": "🍅", "Corn": "🌽",
+    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🎍",
     "Coconut": "🥥", "Cactus": "🌵", "Dragon Fruit": "🐉", "Grape": "🍇", "Mushroom": "🍄",
-    "Pepper": "🌶️", "Cacao": "🍫", "Bean Stalk": "🥒", "Ember Lily": "🔥",
+    "Pepper": "🌶️", "Cacao": "🍫", "Bean Stalk": "🥒", "Ember Lily": "🔥", "Mango": "🥭",
     "Lavender Seed": "💜", "Nectarshade Seed": "🌸", "Flower Seed Pack": "🌻",
-    "Nectarine Seed": "🍑", "Hive Fruit Seed": "🐝", "Orange Tulip": "🦚",
-    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "🥄", "Basic Sprinkler": "🚶",
-    "Advanced Sprinkler": "🚷", "Godly Sprinkler": "⚡", "Lightning Rod": "🌩️",
-    "Master Sprinkler": "👑", "Favourite Tool": "⭐", "Harvest Tool": "✂️",
-    "Friendship Pot": "🤝", "Pollen Radar": "📱", "Nectar Staff": "🌟", "Honey Sprinkler": "🍯",
-    "Bee Crate": "📦", "Honey Walkway": "🛏️", "Honey Comb": "🍯", "Bee Chair": "🪑", "Cleaning Spray": "🔫",
-    "Honey Torch": "🕯️",
-    "Common Egg": "⚪", "Uncommon Egg": "🟢", "Rare Egg": "🔵", "Legendary Egg": "🔹",
-    "Mythical Egg": "🔴", "Bug Egg": "🐛", "Bee Egg": "🐝"
+    "Nectarine Seed": "🍑", "Hive Fruit Seed": "🐝", "Orange Tulip": "🌷🟠",
+    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "🥄", "Basic Sprinkler": "💧",
+    "Advanced Sprinkler": "💦", "Godly Sprinkler": "💦⚡", "Lightning Rod": "🌩️",
+    "Master Sprinkler": "👑💦", "Favourite Tool": "⭐", "Harvest Tool": "✂️",
+    "Friendship Pot": "🤝", "Pollen Radar": "📱", "Nectar Staff": "🍯🌟", "Honey Sprinkler": "🍯",
+    "Bee Crate": "📦", "Honey Walkway": "🍯🛏️", "Honey Comb": "🍯", "Bee Chair": "🍯🪑", "Cleaning Spray": "🔫",
+    "Honey Torch": "🍯",
+    "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚", "Legendary Egg": "🟣🥚",
+    "Mythical Egg": "🔴🥚", "Bug Egg": "🐛🥚", "Bee Egg": "🐝🥚"
 }
 
 all_items = list(emoji_map.keys())
