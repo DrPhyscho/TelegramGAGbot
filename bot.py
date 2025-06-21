@@ -55,6 +55,26 @@ async def fetch_from_api():
         logger.error(f"API fetch failed: {e}")
         return None
 
+def normalize_name(name):
+    return name.strip().casefold()
+
+def filter_relevant_stock(stock):
+    """Return only relevant stock for user preferences, sorted by name."""
+    relevant = {}
+    for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
+        items = stock.get(section, [])
+        if user_preferences:
+            filtered = [
+                item for item in items
+                if normalize_name(item.get("display_name", "")) in 
+                   {normalize_name(p) for p in user_preferences}
+            ]
+        else:
+            filtered = items
+        if filtered:
+            relevant[section] = sorted(filtered, key=lambda x: normalize_name(x.get("display_name", "")))
+    return relevant
+
 def format_stock(title, items):
     message = f"*{title.upper()}*\n"
     for item in items:
@@ -64,19 +84,14 @@ def format_stock(title, items):
         message += f"{emoji} {name} x{qty}\n"
     return message
 
-def build_message(stock_data):
+def build_message(filtered_stock):
     ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
     header = f"🕒 *New Stock Detected!*\n📅 Date & Time: `{ph_time}`\n\n"
     parts = []
 
-    for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
-        items = stock_data.get(section, [])
-        if user_preferences:
-            filtered = [item for item in items if item.get("display_name") in user_preferences]
-        else:
-            filtered = items  # Show all if no preferences
-        if filtered:
-            parts.append(format_stock(section.replace('_', ' ').title(), filtered))
+    for section, items in filtered_stock.items():
+        if items:
+            parts.append(format_stock(section.replace('_', ' ').title(), items))
 
     return header + "\n\n".join(parts)
 
@@ -136,29 +151,16 @@ async def stock_monitor(bot: Bot):
         logger.info("✅ Checking for new stock...")
         stock = await fetch_from_api()
         if stock:
-            should_notify = False
-
-            if user_preferences:
-                for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
-                    for item in stock.get(section, []):
-                        if item.get("display_name") in user_preferences:
-                            should_notify = True
-                            break
-                    if should_notify:
-                        break
-            else:
-                should_notify = True  # Notify all if no preferences
-
-            if should_notify and stock != last_stock:
+            filtered_stock = filter_relevant_stock(stock)
+            if filtered_stock and filtered_stock != last_stock:
                 logger.info("📦 New stock detected, sending a message...")
-                message = build_message(stock)
+                message = build_message(filtered_stock)
                 try:
                     await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN)
-                    last_stock = stock
+                    last_stock = filtered_stock
                 except Exception as e:
                     logger.error(f"❌ Telegram send failed: {e}")
-
-        await asyncio.sleep(15)
+        await asyncio.sleep(30)  # Slightly increased to avoid too frequent checks
 
 # --- Webserver for UptimeRobot ---
 
