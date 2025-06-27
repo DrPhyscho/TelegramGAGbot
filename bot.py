@@ -15,7 +15,7 @@ TOKEN = '7782209619:AAELIyg4HTcOv58K5yObibFVyC44S3s3TM4'
 CHAT_ID = '6172646907'
 STOCK_URL = 'https://api.joshlei.com/v2/growagarden/stock'
 
-# Logging setup
+# Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -23,25 +23,29 @@ logger = logging.getLogger(__name__)
 last_stock = {}
 user_preferences = set()
 
-# Emoji map
+# Updated emoji map
 emoji_map = {
-    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🥐", "Tomato": "🍅", "Corn": "🌽",
-    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🌭",
-    "Coconut": "🥥", "Cactus": "🌵", "Mushroom": "🍄", "Pepper": "🌶️",
-    "Mango": "🥭", "Lavender Seed": "💜", "Nectarshade Seed": "🌸", "Flower Seed Pack": "🌻",
-    "Nectarine Seed": "🍑", "Hive Fruit Seed": "🐝", "Orange Tulip": "🌷🟠",
-    "Cauliflower": "🦬", "Green Apple": "🍏", "Avocado": "🥑", "Banana": "🍌",
-    "Pineapple": "🍍", "Bell Pepper": "🫑", "Prickly Pear": "🌵🥐",
-    "Kiwi": "🥝", "Feijoa": "🍈", "Loquat": "🍑🌿",
-    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "🦄", "Basic Sprinkler": "💧",
-    "Advanced Sprinkler": "💦", "Godly Sprinkler": "💦⚡", "Lightning Rod": "⚩️",
-    "Master Sprinkler": "👑💦", "Favourite Tool": "⭐", "Harvest Tool": "✂️",
-    "Friendship Pot": "🤝", "Pollen Radar": "📱", "Nectar Staff": "🍯🌟", "Honey Sprinkler": "🍯",
-    "Bee Crate": "📦", "Honey Walkway": "🍯🛏️", "Honey Comb": "🍯",
-    "Bee Chair": "🍯🪑", "Cleaning Spray": "🔫", "Honey Torch": "🍯",
-    "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚",
-    "Legendary Egg": "🔹🥚", "Mythical Egg": "🔴🥚", "Bug Egg": "🐛🥚", "Bee Egg": "🐝🥚"
+    # Seeds
+    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🫐", "Tomato": "🍅", "Cauliflower": "🥬",
+    "Watermelon": "🍉", "Green apple": "🍏", "Avocado": "🥑", "Banana": "🍌",
+    "Pineapple": "🍍", "Kiwi": "🥝", "Bell pepper": "🫑", "Prickly pear": "🌵",
+    "Loquat": "🍑🌿", "Feijoa": "🍈", "Sugar apple": "🍬🍏",
+    
+    # Eggs
+    "Common Summer Egg": "🏖️⚪🥚", "Rare Summer Egg": "🏖️🔵🥚", "Paradise Egg": "🌴🥚", "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚",
+    "Legendary Egg": "🔹🥚", "Mythical Egg": "🔴🥚", "Bug Egg": "🐛🥚",
+    
+    # Gear
+     "Godly Sprinkler": "💦⚡", "Tanning Mirror": "🪞", 
+    "Lightning Rod": "⚡", "Master Sprinkler": "👑💦",
+     "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "", "Basic Sprinkler": "💧",
+    "Advanced Sprinkler": "💦", "Favourite Tool": "⭐", "Harvest Tool": "✂️", "Friendship Pot": "🤝",
+    
+    # Cosmetics fallback
+    "Cosmetic": "📦",
 }
+
+# Dynamic item list for /notify
 all_items = list(emoji_map.keys())
 
 def normalize_name(name):
@@ -73,8 +77,8 @@ def format_stock(title, items):
 
 def build_message(filtered_stock):
     ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
-    header = f"🕒 *New Stock Detected!*\n🗕️ Date & Time: `{ph_time}`\n\n"
-    parts = [format_stock(section.replace('_', ' ').title(), items) for section, items in filtered_stock.items() if items]
+    header = f"🕒 *New Stock Detected!*\n🗓️ Date & Time: `{ph_time}`\n\n"
+    parts = [format_stock(section.replace('_', ' ').title(), items) for section, items in filtered_stock.items()]
     return header + "\n\n".join(parts)
 
 async def fetch_from_api():
@@ -128,7 +132,6 @@ async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message += f"\n🔔 *Items Being Tracked:*\n{item_list}"
     await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
 
-# Monitor Function with Rate Awareness
 async def stock_monitor(bot: Bot):
     global last_stock
     wait_time = 30
@@ -152,7 +155,6 @@ async def stock_monitor(bot: Bot):
                 except Exception as e:
                     logger.error(f"❌ Telegram send failed: {e}")
 
-        # Adjust interval based on remaining calls
         try:
             rem_ip = int(remaining_ip) if remaining_ip else 10000
             rem_global = int(remaining_global) if remaining_global else 100000
@@ -174,7 +176,6 @@ async def stock_monitor(bot: Bot):
 
         await asyncio.sleep(wait_time)
 
-# Web server
 async def healthcheck(request):
     return web.Response(text="Bot is alive!")
 
@@ -187,7 +188,6 @@ async def start_webserver():
     await site.start()
     logger.info("🌐 Health check server running on http://0.0.0.0:8080")
 
-# Main
 async def main():
     logger.info("🎯 Starting GrowAGarden bot...")
     bot = Bot(TOKEN)
