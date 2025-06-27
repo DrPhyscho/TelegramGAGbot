@@ -25,49 +25,36 @@ user_preferences = set()
 
 # Emoji map
 emoji_map = {
-    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🫐", "Tomato": "🍅", "Corn": "🌽",
-    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🎍",
-    "Coconut": "🥥", "Cactus": "🌵", "Dragon Fruit": "🐉", "Grape": "🍇", "Mushroom": "🍄",
-    "Pepper": "🌶️", "Cacao": "🍫", "Bean Stalk": "🥒", "Ember Lily": "🔥", "Mango": "🥭",
-    "Lavender Seed": "💜", "Nectarshade Seed": "🌸", "Flower Seed Pack": "🌻",
+    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🥐", "Tomato": "🍅", "Corn": "🌽",
+    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🌭",
+    "Coconut": "🥥", "Cactus": "🌵", "Mushroom": "🍄", "Pepper": "🌶️",
+    "Mango": "🥭", "Lavender Seed": "💜", "Nectarshade Seed": "🌸", "Flower Seed Pack": "🌻",
     "Nectarine Seed": "🍑", "Hive Fruit Seed": "🐝", "Orange Tulip": "🌷🟠",
-    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "🥄", "Basic Sprinkler": "💧",
-    "Advanced Sprinkler": "💦", "Godly Sprinkler": "💦⚡", "Lightning Rod": "🌩️",
+    "Cauliflower": "🦬", "Green Apple": "🍏", "Avocado": "🥑", "Banana": "🍌",
+    "Pineapple": "🍍", "Bell Pepper": "🫑", "Prickly Pear": "🌵🥐",
+    "Kiwi": "🥝", "Feijoa": "🍈", "Loquat": "🍑🌿",
+    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "🦄", "Basic Sprinkler": "💧",
+    "Advanced Sprinkler": "💦", "Godly Sprinkler": "💦⚡", "Lightning Rod": "⚩️",
     "Master Sprinkler": "👑💦", "Favourite Tool": "⭐", "Harvest Tool": "✂️",
     "Friendship Pot": "🤝", "Pollen Radar": "📱", "Nectar Staff": "🍯🌟", "Honey Sprinkler": "🍯",
-    "Bee Crate": "📦", "Honey Walkway": "🍯🛏️", "Honey Comb": "🍯", "Bee Chair": "🍯🪑", "Cleaning Spray": "🔫",
-    "Honey Torch": "🍯",
-    "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚", "Legendary Egg": "🟣🥚",
-    "Mythical Egg": "🔴🥚", "Bug Egg": "🐛🥚", "Bee Egg": "🐝🥚"
+    "Bee Crate": "📦", "Honey Walkway": "🍯🛏️", "Honey Comb": "🍯",
+    "Bee Chair": "🍯🪑", "Cleaning Spray": "🔫", "Honey Torch": "🍯",
+    "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚",
+    "Legendary Egg": "🔹🥚", "Mythical Egg": "🔴🥚", "Bug Egg": "🐛🥚", "Bee Egg": "🐝🥚"
 }
-
 all_items = list(emoji_map.keys())
-
-# --- Helper Functions ---
-
-async def fetch_from_api():
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(STOCK_URL, timeout=10) as resp:
-                resp.raise_for_status()
-                return await resp.json()
-    except Exception as e:
-        logger.error(f"API fetch failed: {e}")
-        return None
 
 def normalize_name(name):
     return name.strip().casefold()
 
 def filter_relevant_stock(stock):
-    """Return only relevant stock for user preferences, sorted by name."""
     relevant = {}
     for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
         items = stock.get(section, [])
         if user_preferences:
             filtered = [
                 item for item in items
-                if normalize_name(item.get("display_name", "")) in 
-                   {normalize_name(p) for p in user_preferences}
+                if normalize_name(item.get("display_name", "")) in {normalize_name(p) for p in user_preferences}
             ]
         else:
             filtered = items
@@ -86,22 +73,33 @@ def format_stock(title, items):
 
 def build_message(filtered_stock):
     ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
-    header = f"🕒 *New Stock Detected!*\n📅 Date & Time: `{ph_time}`\n\n"
-    parts = []
-
-    for section, items in filtered_stock.items():
-        if items:
-            parts.append(format_stock(section.replace('_', ' ').title(), items))
-
+    header = f"🕒 *New Stock Detected!*\n🗕️ Date & Time: `{ph_time}`\n\n"
+    parts = [format_stock(section.replace('_', ' ').title(), items) for section, items in filtered_stock.items() if items]
     return header + "\n\n".join(parts)
 
-# --- Command Handlers ---
+async def fetch_from_api():
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(STOCK_URL, timeout=10) as resp:
+                remaining_ip = resp.headers.get("Ratelimit-Remaining-Ip")
+                remaining_global = resp.headers.get("Ratelimit-Remaining-Global")
+                retry_after = resp.headers.get("Retry-After")
+
+                logger.info(f"📊 Ratelimit IP: {remaining_ip}, Global: {remaining_global}")
+
+                if retry_after:
+                    wait = int(retry_after)
+                    logger.warning(f"⚠️ Hit rate limit. Retrying after {wait}s...")
+                    return None, remaining_ip, remaining_global, wait
+
+                resp.raise_for_status()
+                return await resp.json(), remaining_ip, remaining_global, None
+    except Exception as e:
+        logger.error(f"API fetch failed: {e}")
+        return None, None, None, None
 
 async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = []
-    for item in all_items:
-        emoji = emoji_map.get(item, "📦")
-        keyboard.append([InlineKeyboardButton(f"{emoji} {item}", callback_data=item)])
+    keyboard = [[InlineKeyboardButton(f"{emoji_map.get(item, '📦')} {item}", callback_data=item)] for item in all_items]
     await update.message.reply_text("Select items to get notified for:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -119,51 +117,64 @@ async def notifylist_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not user_preferences:
         await update.message.reply_text("You have not selected any items yet.")
         return
-
-    msg = "*Your Selected Stock Items:*\n"
-    for item in sorted(user_preferences):
-        emoji = emoji_map.get(item, "📦")
-        msg += f"{emoji} {item}\n"
-
+    msg = "*Your Selected Stock Items:*\n" + "\n".join([f"{emoji_map.get(item, '📦')} {item}" for item in sorted(user_preferences)])
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
-    item_count = len(user_preferences)
     item_list = '\n'.join([f"{emoji_map.get(item, '📦')} {item}" for item in sorted(user_preferences)])
-
-    message = (
-        "✅ *Bot Status: Alive*\n"
-        f"🕒 *Current Time (PH)*: `{ph_time}`\n"
-        f"📦 *Tracking {item_count} item(s)*\n"
-    )
-
-    if item_count:
-        message += "\n🔔 *Items Being Tracked:*\n" + item_list
-
+    message = f"✅ *Bot Status: Alive*\n🕒 *Current Time (PH)*: `{ph_time}`\n📦 *Tracking {len(user_preferences)} item(s)*\n"
+    if user_preferences:
+        message += f"\n🔔 *Items Being Tracked:*\n{item_list}"
     await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
 
-# --- Background Task ---
-
+# Monitor Function with Rate Awareness
 async def stock_monitor(bot: Bot):
     global last_stock
+    wait_time = 30
+    sent_limit_alert = False
+
     while True:
-        logger.info("✅ Checking for new stock...")
-        stock = await fetch_from_api()
+        logger.info(f"🔍 Checking for new stock (interval: {wait_time}s)...")
+        stock, remaining_ip, remaining_global, wait_override = await fetch_from_api()
+
+        if wait_override:
+            await asyncio.sleep(wait_override)
+            continue
+
         if stock:
             filtered_stock = filter_relevant_stock(stock)
             if filtered_stock and filtered_stock != last_stock:
-                logger.info("📦 New stock detected, sending a message...")
                 message = build_message(filtered_stock)
                 try:
                     await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN)
                     last_stock = filtered_stock
                 except Exception as e:
                     logger.error(f"❌ Telegram send failed: {e}")
-        await asyncio.sleep(30)  # Slightly increased to avoid too frequent checks
 
-# --- Webserver for UptimeRobot ---
+        # Adjust interval based on remaining calls
+        try:
+            rem_ip = int(remaining_ip) if remaining_ip else 10000
+            rem_global = int(remaining_global) if remaining_global else 100000
 
+            if rem_ip < 10 or rem_global < 100:
+                if not sent_limit_alert:
+                    await bot.send_message(chat_id=CHAT_ID, text=f"⚠️ *Warning:* API rate limit near!\nRatelimit-Remaining-Ip: {rem_ip}\nRatelimit-Remaining-Global: {rem_global}", parse_mode=ParseMode.MARKDOWN)
+                    sent_limit_alert = True
+                wait_time = 180
+            elif rem_ip < 100 or rem_global < 500:
+                wait_time = 60
+                sent_limit_alert = False
+            else:
+                wait_time = 30
+                sent_limit_alert = False
+        except Exception as e:
+            logger.warning(f"⚠️ Rate parsing error: {e}")
+            wait_time = 30
+
+        await asyncio.sleep(wait_time)
+
+# Web server
 async def healthcheck(request):
     return web.Response(text="Bot is alive!")
 
@@ -176,8 +187,7 @@ async def start_webserver():
     await site.start()
     logger.info("🌐 Health check server running on http://0.0.0.0:8080")
 
-# --- Main Function ---
-
+# Main
 async def main():
     logger.info("🎯 Starting GrowAGarden bot...")
     bot = Bot(TOKEN)
@@ -191,10 +201,8 @@ async def main():
     await start_webserver()
     asyncio.create_task(stock_monitor(bot))
 
-    logger.info("🚀 GrowAGarden bot + server is running...")
+    logger.info("🚀 Bot + healthcheck running...")
     await app.run_polling()
-
-# --- Entry Point ---
 
 if __name__ == "__main__":
     nest_asyncio.apply()
