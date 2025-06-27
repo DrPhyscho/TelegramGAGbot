@@ -23,29 +23,24 @@ logger = logging.getLogger(__name__)
 last_stock = {}
 user_preferences = set()
 
-# Updated emoji map
+# Emoji Map
 emoji_map = {
-    # Seeds
     "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🫐", "Tomato": "🍅", "Cauliflower": "🥬",
-    "Watermelon": "🍉", "Green apple": "🍏", "Avocado": "🥑", "Banana": "🍌",
-    "Pineapple": "🍍", "Kiwi": "🥝", "Bell pepper": "🫑", "Prickly pear": "🌵",
-    "Loquat": "🍑🌿", "Feijoa": "🍈", "Sugar apple": "🍬🍏",
-    
-    # Eggs
-    "Common Summer Egg": "🏖️⚪🥚", "Rare Summer Egg": "🏖️🔵🥚", "Paradise Egg": "🌴🥚", "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚",
+    "Watermelon": "🍉", "Green apple": "🍏", "Avocado": "🥑", "Banana": "🍌", "Pineapple": "🍍",
+    "Kiwi": "🥝", "Bell pepper": "🫑", "Prickly pear": "🌵", "Loquat": "🍑🌿", "Feijoa": "🍈", "Sugar apple": "🍬🍏",
+
+    "Common Summer Egg": "🏖️⚪🥚", "Rare Summer Egg": "🏖️🔵🥚", "Paradise Egg": "🌴🏖️🥚",
+    "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚",
     "Legendary Egg": "🔹🥚", "Mythical Egg": "🔴🥚", "Bug Egg": "🐛🥚",
-    
-    # Gear
-     "Godly Sprinkler": "💦⚡", "Tanning Mirror": "🪞", 
-    "Lightning Rod": "⚡", "Master Sprinkler": "👑💦",
-     "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "", "Basic Sprinkler": "💧",
+
+    "Godly Sprinkler": "💦⚡", "Tanning Mirror": "🪞", "Lightning Rod": "⚡", "Master Sprinkler": "👑💦",
+    "Watering Can": "🚿", "Recall Wrench": "🔧", "Trowel": "📦", "Basic Sprinkler": "💧",
     "Advanced Sprinkler": "💦", "Favourite Tool": "⭐", "Harvest Tool": "✂️", "Friendship Pot": "🤝",
-    
-    # Cosmetics fallback
+
     "Cosmetic": "📦",
 }
 
-# Dynamic item list for /notify
+# All possible items
 all_items = list(emoji_map.keys())
 
 def normalize_name(name):
@@ -55,13 +50,7 @@ def filter_relevant_stock(stock):
     relevant = {}
     for section in ["seed_stock", "gear_stock", "egg_stock", "cosmetic_stock"]:
         items = stock.get(section, [])
-        if user_preferences:
-            filtered = [
-                item for item in items
-                if normalize_name(item.get("display_name", "")) in {normalize_name(p) for p in user_preferences}
-            ]
-        else:
-            filtered = items
+        filtered = [item for item in items if normalize_name(item.get("display_name", "")) in {normalize_name(p) for p in user_preferences}]
         if filtered:
             relevant[section] = sorted(filtered, key=lambda x: normalize_name(x.get("display_name", "")))
     return relevant
@@ -90,11 +79,8 @@ async def fetch_from_api():
                 retry_after = resp.headers.get("Retry-After")
 
                 logger.info(f"📊 Ratelimit IP: {remaining_ip}, Global: {remaining_global}")
-
                 if retry_after:
-                    wait = int(retry_after)
-                    logger.warning(f"⚠️ Hit rate limit. Retrying after {wait}s...")
-                    return None, remaining_ip, remaining_global, wait
+                    return None, remaining_ip, remaining_global, int(retry_after)
 
                 resp.raise_for_status()
                 return await resp.json(), remaining_ip, remaining_global, None
@@ -103,8 +89,14 @@ async def fetch_from_api():
         return None, None, None, None
 
 async def notify_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [[InlineKeyboardButton(f"{emoji_map.get(item, '📦')} {item}", callback_data=item)] for item in all_items]
-    await update.message.reply_text("Select items to get notified for:", reply_markup=InlineKeyboardMarkup(keyboard))
+    keyboard = [
+        [InlineKeyboardButton(f"{emoji_map.get(item, '📦')} {item}", callback_data=item)]
+        for item in all_items
+    ]
+    await update.message.reply_text(
+        "🔔 Select items to get notified for (tap to toggle):",
+        reply_markup=InlineKeyboardMarkup(keyboard)
+    )
 
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
@@ -112,25 +104,25 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     item = query.data
     if item in user_preferences:
         user_preferences.remove(item)
-        await query.edit_message_text(text=f"❌ Removed *{item}* from notification list.", parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text(f"❌ Removed *{item}* from your list.", parse_mode=ParseMode.MARKDOWN)
     else:
         user_preferences.add(item)
-        await query.edit_message_text(text=f"✅ Added *{item}* to notification list.", parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text(f"✅ Added *{item}* to your list.", parse_mode=ParseMode.MARKDOWN)
 
 async def notifylist_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not user_preferences:
-        await update.message.reply_text("You have not selected any items yet.")
+        await update.message.reply_text("📭 You haven't selected any items.")
         return
-    msg = "*Your Selected Stock Items:*\n" + "\n".join([f"{emoji_map.get(item, '📦')} {item}" for item in sorted(user_preferences)])
+    msg = "*Your Selected Items:*\n" + "\n".join([f"{emoji_map.get(item, '📦')} {item}" for item in sorted(user_preferences)])
     await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ph_time = datetime.now(pytz.timezone("Asia/Manila")).strftime("%Y-%m-%d %I:%M:%S %p")
-    item_list = '\n'.join([f"{emoji_map.get(item, '📦')} {item}" for item in sorted(user_preferences)])
-    message = f"✅ *Bot Status: Alive*\n🕒 *Current Time (PH)*: `{ph_time}`\n📦 *Tracking {len(user_preferences)} item(s)*\n"
+    items = '\n'.join([f"{emoji_map.get(item, '📦')} {item}" for item in sorted(user_preferences)])
+    msg = f"✅ *Bot is Alive!*\n🕒 Time (PH): `{ph_time}`\n🔔 Tracking {len(user_preferences)} item(s).\n"
     if user_preferences:
-        message += f"\n🔔 *Items Being Tracked:*\n{item_list}"
-    await update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+        msg += f"\n📦 *Items:* \n{items}"
+    await update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN)
 
 async def stock_monitor(bot: Bot):
     global last_stock
@@ -138,40 +130,42 @@ async def stock_monitor(bot: Bot):
     sent_limit_alert = False
 
     while True:
-        logger.info(f"🔍 Checking for new stock (interval: {wait_time}s)...")
-        stock, remaining_ip, remaining_global, wait_override = await fetch_from_api()
+        logger.info("🔍 Checking stock...")
+        stock, rem_ip, rem_global, wait_override = await fetch_from_api()
 
         if wait_override:
             await asyncio.sleep(wait_override)
             continue
 
         if stock:
-            filtered_stock = filter_relevant_stock(stock)
-            if filtered_stock and filtered_stock != last_stock:
-                message = build_message(filtered_stock)
+            filtered = filter_relevant_stock(stock)
+            if filtered and filtered != last_stock:
                 try:
-                    await bot.send_message(chat_id=CHAT_ID, text=message, parse_mode=ParseMode.MARKDOWN)
-                    last_stock = filtered_stock
+                    await bot.send_message(chat_id=CHAT_ID, text=build_message(filtered), parse_mode=ParseMode.MARKDOWN)
+                    last_stock = filtered
                 except Exception as e:
-                    logger.error(f"❌ Telegram send failed: {e}")
+                    logger.error(f"Telegram send failed: {e}")
 
         try:
-            rem_ip = int(remaining_ip) if remaining_ip else 10000
-            rem_global = int(remaining_global) if remaining_global else 100000
+            ip = int(rem_ip) if rem_ip else 10000
+            glob = int(rem_global) if rem_global else 100000
 
-            if rem_ip < 10 or rem_global < 100:
+            if ip < 10 or glob < 100:
                 if not sent_limit_alert:
-                    await bot.send_message(chat_id=CHAT_ID, text=f"⚠️ *Warning:* API rate limit near!\nRatelimit-Remaining-Ip: {rem_ip}\nRatelimit-Remaining-Global: {rem_global}", parse_mode=ParseMode.MARKDOWN)
+                    await bot.send_message(
+                        chat_id=CHAT_ID,
+                        text=f"⚠️ *Warning:* API rate limit near!\nIP: {ip}, Global: {glob}",
+                        parse_mode=ParseMode.MARKDOWN
+                    )
                     sent_limit_alert = True
                 wait_time = 180
-            elif rem_ip < 100 or rem_global < 500:
+            elif ip < 100 or glob < 500:
                 wait_time = 60
                 sent_limit_alert = False
             else:
                 wait_time = 30
                 sent_limit_alert = False
-        except Exception as e:
-            logger.warning(f"⚠️ Rate parsing error: {e}")
+        except:
             wait_time = 30
 
         await asyncio.sleep(wait_time)
@@ -184,12 +178,12 @@ async def start_webserver():
     app.router.add_get("/", healthcheck)
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, host="0.0.0.0", port=8080)
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
-    logger.info("🌐 Health check server running on http://0.0.0.0:8080")
+    logger.info("🌐 Healthcheck server on port 8080")
 
 async def main():
-    logger.info("🎯 Starting GrowAGarden bot...")
+    logger.info("🚀 Starting GrowAGarden Bot...")
     bot = Bot(TOKEN)
     app = Application.builder().token(TOKEN).build()
 
@@ -200,8 +194,6 @@ async def main():
 
     await start_webserver()
     asyncio.create_task(stock_monitor(bot))
-
-    logger.info("🚀 Bot + healthcheck running...")
     await app.run_polling()
 
 if __name__ == "__main__":
