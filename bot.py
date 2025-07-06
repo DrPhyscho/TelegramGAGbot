@@ -26,12 +26,14 @@ user_preferences = set()
 # Emoji map
 emoji_map = {
     # Seeds
-    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🫐", "Tomato": "🍅", "Cauliflower": "🥬",
-    "Watermelon": "🍉", "Green apple": "🍏", "Avocado": "🥑", "Banana": "🍌",
-    "Pineapple": "🍍", "Kiwi": "🥝", "Bell pepper": "🫑", "Prickly pear": "🌵",
-    "Loquat": "🍑🌿", "Feijoa": "🍈", "Sugar apple": "🍬🍏",
+    "Carrot": "🥕", "Strawberry": "🍓", "Blueberry": "🍇", "Tomato": "🍅", "Corn": "🌽",
+    "Daffodil": "🌼", "Watermelon": "🍉", "Pumpkin": "🎃", "Apple": "🍎", "Bamboo": "🎋",
+    "Coconut": "🥥", "Cactus": "🌵", "Dragon Fruit": "🐉", "Grape": "🍇", "Mushroom": "🍄",
+    "Pepper": "🌶️", "Cacao": "🍫", "Bean Stalk": "🥒", "Ember Lily": "🔥",
+    "Sugar Apple": "🍬🍏", "Burning Bud": "🌶️🔥",
 
-    # Eggs
+
+   # Eggs
     "Common Summer Egg": "🏖️⚪🥚", "Rare Summer Egg": "🏖️🔵🥚", "Paradise Egg": "🏖️🌴🥚",
     "Common Egg": "⚪🥚", "Uncommon Egg": "🟢🥚", "Rare Egg": "🔵🥚",
     "Legendary Egg": "🔹🥚", "Mythical Egg": "🔴🥚", "Bug Egg": "🐛🥚",
